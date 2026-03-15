@@ -1,0 +1,1429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DrillBird — Math Fact Fluency</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323:wght@400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --pixel: 4px;
+    --bg: #0a0a1a;
+    --bg2: #111128;
+    --panel: #1a1a3a;
+    --border: #3a3a7a;
+    --yellow: #ffd700;
+    --orange: #ff8c00;
+    --green: #00e676;
+    --red: #ff1744;
+    --blue: #40c4ff;
+    --white: #f0f0ff;
+    --gray: #666688;
+    --teal: #00bcd4;
+    --purple: #7c4dff;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; image-rendering: pixelated; }
+
+  body {
+    background: var(--bg);
+    color: var(--white);
+    font-family: 'Press Start 2P', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow-x: hidden;
+    padding: 20px;
+  }
+
+  /* Scanline effect */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.08) 2px,
+      rgba(0,0,0,0.08) 4px
+    );
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  /* Starfield background */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      radial-gradient(1px 1px at 10% 20%, #ffffff22 0%, transparent 100%),
+      radial-gradient(1px 1px at 30% 60%, #ffffff18 0%, transparent 100%),
+      radial-gradient(1px 1px at 70% 15%, #ffffff20 0%, transparent 100%),
+      radial-gradient(1px 1px at 85% 45%, #ffffff15 0%, transparent 100%),
+      radial-gradient(1px 1px at 50% 80%, #ffffff22 0%, transparent 100%),
+      radial-gradient(1px 1px at 20% 90%, #ffffff18 0%, transparent 100%),
+      radial-gradient(1px 1px at 90% 75%, #ffffff20 0%, transparent 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .screen {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 680px;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+  }
+  .screen.active { display: flex; }
+
+  /* PIXEL PANEL */
+  .panel {
+    background: var(--panel);
+    border: 4px solid var(--border);
+    box-shadow:
+      inset 0 0 0 2px #0a0a1a,
+      4px 4px 0 #000,
+      0 0 40px rgba(64,196,255,0.08);
+    padding: 28px;
+    width: 100%;
+  }
+
+  .panel-title {
+    font-size: 10px;
+    color: var(--gray);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 16px;
+    text-align: center;
+  }
+
+  /* TOUCAN SVG */
+  .toucan-wrap {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 8px;
+  }
+
+  .toucan {
+    width: 80px;
+    height: 80px;
+  }
+
+  .toucan.dancing {
+    animation: dance 0.2s steps(1) infinite;
+  }
+
+  @keyframes dance {
+    0%   { transform: translateY(0) scaleX(1); }
+    25%  { transform: translateY(-4px) scaleX(1); }
+    50%  { transform: translateY(0) scaleX(-1); }
+    75%  { transform: translateY(-4px) scaleX(-1); }
+    100% { transform: translateY(0) scaleX(1); }
+  }
+
+  .toucan.wrong {
+    animation: wrongShake 0.3s steps(1);
+  }
+
+  @keyframes wrongShake {
+    0%   { transform: translateX(0); filter: brightness(1); }
+    20%  { transform: translateX(-6px); filter: brightness(2) hue-rotate(0deg); }
+    40%  { transform: translateX(6px); filter: brightness(2) hue-rotate(180deg); }
+    60%  { transform: translateX(-6px); filter: brightness(2) hue-rotate(0deg); }
+    80%  { transform: translateX(6px); }
+    100% { transform: translateX(0); filter: brightness(1); }
+  }
+
+  /* LOGO */
+  .logo {
+    font-size: 24px;
+    color: var(--yellow);
+    text-shadow:
+      3px 3px 0 var(--orange),
+      6px 6px 0 #000;
+    text-align: center;
+    letter-spacing: 2px;
+    line-height: 1.4;
+  }
+
+  .logo span {
+    color: var(--teal);
+    text-shadow:
+      3px 3px 0 #006080,
+      6px 6px 0 #000;
+  }
+
+  .tagline {
+    font-size: 7px;
+    color: var(--gray);
+    text-align: center;
+    margin-top: 4px;
+  }
+
+  /* OPERATION SELECT */
+  .op-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    width: 100%;
+  }
+
+  .op-btn {
+    background: var(--bg2);
+    border: 4px solid var(--border);
+    color: var(--white);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
+    padding: 20px 12px;
+    cursor: pointer;
+    text-align: center;
+    transition: none;
+    box-shadow: 4px 4px 0 #000;
+    line-height: 1.8;
+  }
+
+  .op-btn:hover {
+    background: var(--border);
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 #000;
+  }
+
+  .op-btn:active {
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0 #000;
+  }
+
+  .op-btn .op-icon {
+    font-size: 20px;
+    display: block;
+    margin-bottom: 10px;
+  }
+
+  .op-btn.mult { border-color: var(--yellow); }
+  .op-btn.mult:hover { background: #2a2a00; border-color: var(--yellow); }
+  .op-btn.sub { border-color: var(--teal); }
+  .op-btn.sub:hover { background: #002a2a; border-color: var(--teal); }
+
+  /* SET SELECT */
+  .set-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .set-btn {
+    background: var(--bg2);
+    border: 3px solid var(--border);
+    color: var(--white);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    padding: 14px 16px;
+    cursor: pointer;
+    text-align: left;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 3px 3px 0 #000;
+  }
+
+  .set-btn:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 5px 5px 0 #000;
+  }
+
+  .set-btn:active {
+    transform: translate(1px, 1px);
+    box-shadow: 1px 1px 0 #000;
+  }
+
+  .set-btn.mult-set { border-color: #665500; }
+  .set-btn.mult-set:hover { background: #1a1500; border-color: var(--yellow); color: var(--yellow); }
+  .set-btn.sub-set { border-color: #005555; }
+  .set-btn.sub-set:hover { background: #001515; border-color: var(--teal); color: var(--teal); }
+
+  .set-count {
+    color: var(--gray);
+    font-size: 7px;
+  }
+
+  /* BACK BTN */
+  .back-btn {
+    background: transparent;
+    border: 2px solid var(--gray);
+    color: var(--gray);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px;
+    padding: 8px 14px;
+    cursor: pointer;
+    box-shadow: 2px 2px 0 #000;
+  }
+  .back-btn:hover { color: var(--white); border-color: var(--white); }
+
+  /* DRILL SCREEN */
+  .progress-bar-wrap {
+    width: 100%;
+    height: 12px;
+    background: var(--bg2);
+    border: 3px solid var(--border);
+    box-shadow: inset 2px 2px 0 #000;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    transition: width 0.3s steps(10);
+  }
+
+  .progress-label {
+    font-size: 7px;
+    color: var(--gray);
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    margin-top: 6px;
+  }
+
+  .fact-display {
+    text-align: center;
+    padding: 32px 20px;
+    width: 100%;
+  }
+
+  .fact-equation {
+    font-size: 36px;
+    color: var(--white);
+    text-shadow: 4px 4px 0 #000;
+    letter-spacing: 4px;
+    margin-bottom: 32px;
+    line-height: 1.4;
+  }
+
+  .fact-equation.mult-color { color: var(--yellow); text-shadow: 4px 4px 0 #443300; }
+  .fact-equation.sub-color { color: var(--teal); text-shadow: 4px 4px 0 #003344; }
+
+  .answer-input {
+    background: var(--bg);
+    border: 4px solid var(--border);
+    color: var(--white);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 28px;
+    text-align: center;
+    width: 140px;
+    padding: 12px;
+    outline: none;
+    box-shadow: inset 3px 3px 0 #000;
+    caret-color: var(--yellow);
+  }
+
+  .answer-input:focus {
+    border-color: var(--yellow);
+    box-shadow: inset 3px 3px 0 #000, 0 0 12px rgba(255,215,0,0.3);
+  }
+
+  .answer-input.correct-flash {
+    border-color: var(--green);
+    background: #001a00;
+    animation: correctPulse 0.3s ease;
+  }
+
+  .answer-input.wrong-flash {
+    border-color: var(--red);
+    background: #1a0000;
+    animation: wrongPulse 0.3s ease;
+  }
+
+  @keyframes correctPulse {
+    0% { box-shadow: inset 3px 3px 0 #000, 0 0 0 rgba(0,230,118,0); }
+    50% { box-shadow: inset 3px 3px 0 #000, 0 0 24px rgba(0,230,118,0.8); }
+    100% { box-shadow: inset 3px 3px 0 #000, 0 0 0 rgba(0,230,118,0); }
+  }
+
+  @keyframes wrongPulse {
+    0% { box-shadow: inset 3px 3px 0 #000, 0 0 0 rgba(255,23,68,0); }
+    50% { box-shadow: inset 3px 3px 0 #000, 0 0 24px rgba(255,23,68,0.8); }
+    100% { box-shadow: inset 3px 3px 0 #000, 0 0 0 rgba(255,23,68,0); }
+  }
+
+  .feedback-msg {
+    font-size: 8px;
+    height: 20px;
+    margin-top: 16px;
+    text-align: center;
+  }
+
+  .feedback-msg.correct { color: var(--green); }
+  .feedback-msg.wrong { color: var(--red); }
+
+  .correct-answer-reveal {
+    font-size: 7px;
+    color: var(--orange);
+    margin-top: 8px;
+    height: 16px;
+    text-align: center;
+  }
+
+  .queue-status {
+    font-size: 7px;
+    color: var(--gray);
+    text-align: center;
+    padding: 8px;
+  }
+
+  /* COMPLETION SCREEN */
+  .completion-header {
+    text-align: center;
+    width: 100%;
+  }
+
+  .completion-title {
+    font-size: 14px;
+    color: var(--green);
+    text-shadow: 3px 3px 0 #003300, 6px 6px 0 #000;
+    margin-bottom: 8px;
+    line-height: 1.6;
+  }
+
+  .completion-set-name {
+    font-size: 8px;
+    color: var(--gray);
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    width: 100%;
+  }
+
+  .stat-box {
+    background: var(--bg2);
+    border: 3px solid var(--border);
+    padding: 16px 8px;
+    text-align: center;
+    box-shadow: 3px 3px 0 #000;
+  }
+
+  .stat-value {
+    font-size: 22px;
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  .stat-label {
+    font-size: 6px;
+    color: var(--gray);
+    line-height: 1.6;
+  }
+
+  .stat-box.time-box .stat-value { color: var(--blue); }
+  .stat-box.attempts-box .stat-value { color: var(--yellow); }
+  .stat-box.accuracy-box .stat-value { color: var(--green); }
+
+  /* MOST MISSED - BIG */
+  .most-missed-box {
+    width: 100%;
+    background: #1a0a00;
+    border: 4px solid var(--orange);
+    padding: 20px;
+    text-align: center;
+    box-shadow: 4px 4px 0 #000, 0 0 20px rgba(255,140,0,0.2);
+  }
+
+  .most-missed-label {
+    font-size: 7px;
+    color: var(--orange);
+    margin-bottom: 12px;
+    letter-spacing: 2px;
+  }
+
+  .most-missed-fact {
+    font-size: 32px;
+    color: var(--white);
+    text-shadow: 3px 3px 0 var(--orange), 6px 6px 0 #000;
+    letter-spacing: 4px;
+  }
+
+  .most-missed-count {
+    font-size: 7px;
+    color: var(--gray);
+    margin-top: 8px;
+  }
+
+  .no-misses {
+    font-size: 10px;
+    color: var(--green);
+    text-shadow: 2px 2px 0 #003300;
+  }
+
+  /* PIXEL BTN */
+  .pixel-btn {
+    background: var(--yellow);
+    border: 4px solid #000;
+    color: #000;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
+    padding: 14px 24px;
+    cursor: pointer;
+    box-shadow: 4px 4px 0 #000;
+    text-transform: uppercase;
+  }
+
+  .pixel-btn:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 #000;
+  }
+
+  .pixel-btn:active {
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0 #000;
+  }
+
+  .pixel-btn.secondary {
+    background: var(--bg2);
+    border-color: var(--border);
+    color: var(--white);
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  /* PIXEL STARS animation */
+  .stars-container {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 999;
+    overflow: hidden;
+  }
+
+  .pixel-star {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: var(--yellow);
+    animation: starFall 1s steps(8) forwards;
+  }
+
+  @keyframes starFall {
+    0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
+  }
+
+  /* Blinking cursor effect */
+  .blink {
+    animation: blink 1s steps(1) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* PIXEL DIVIDER */
+  .pixel-divider {
+    width: 100%;
+    height: 4px;
+    background: repeating-linear-gradient(
+      90deg,
+      var(--border) 0px,
+      var(--border) 8px,
+      transparent 8px,
+      transparent 16px
+    );
+  }
+
+  /* Timer during drill */
+  .live-timer {
+    font-size: 8px;
+    color: var(--gray);
+    text-align: right;
+    width: 100%;
+  }
+
+  .live-timer span { color: var(--blue); }
+
+  /* SUBMIT BUTTON */
+  .submit-btn {
+    background: var(--green);
+    border: 4px solid #000;
+    color: #000;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 11px;
+    padding: 14px 36px;
+    cursor: pointer;
+    box-shadow: 4px 4px 0 #000;
+    display: block;
+    margin: 0 auto;
+    letter-spacing: 1px;
+  }
+  .submit-btn:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 #000;
+    background: #00ff88;
+  }
+  .submit-btn:active {
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0 #000;
+  }
+  .submit-btn:disabled {
+    background: var(--gray);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: 4px 4px 0 #000;
+  }
+
+  /* SOUND TOGGLE */
+  .sound-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 7px;
+    color: var(--gray);
+    cursor: pointer;
+    user-select: none;
+  }
+  .sound-toggle:hover { color: var(--white); }
+
+  .toggle-track {
+    width: 36px;
+    height: 16px;
+    background: var(--bg2);
+    border: 3px solid var(--border);
+    position: relative;
+    cursor: pointer;
+    box-shadow: 2px 2px 0 #000;
+    flex-shrink: 0;
+  }
+  .toggle-thumb {
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    width: 10px;
+    height: 10px;
+    background: var(--gray);
+    transition: none;
+  }
+  .toggle-track.on { border-color: var(--green); }
+  .toggle-track.on .toggle-thumb {
+    left: 21px;
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+  }
+
+  /* SHOW TEACHER BANNER */
+  .teacher-banner {
+    width: 100%;
+    background: var(--yellow);
+    border: 4px solid #000;
+    box-shadow: 4px 4px 0 #000;
+    padding: 14px 20px;
+    text-align: center;
+    font-size: 9px;
+    color: #000;
+    letter-spacing: 1px;
+    animation: bannerPulse 1s steps(1) 3;
+  }
+  @keyframes bannerPulse {
+    0%, 100% { background: var(--yellow); }
+    50% { background: var(--orange); }
+  }
+
+  /* Mobile */
+  @media (max-width: 500px) {
+    .fact-equation { font-size: 26px; }
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+    .logo { font-size: 18px; }
+    .op-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="stars-container" id="starsContainer"></div>
+
+<!-- SCREEN 1: HOME -->
+<div class="screen active" id="homeScreen">
+  <div class="toucan-wrap">
+    <svg class="toucan" id="homeToucan" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+      <!-- Body -->
+      <rect x="10" y="14" width="14" height="12" fill="#111"/>
+      <rect x="11" y="13" width="12" height="2" fill="#111"/>
+      <!-- White chest -->
+      <rect x="12" y="15" width="8" height="8" fill="#f0f0f0"/>
+      <rect x="11" y="16" width="10" height="6" fill="#f0f0f0"/>
+      <!-- Head -->
+      <rect x="12" y="8" width="10" height="8" fill="#111"/>
+      <rect x="11" y="9" width="12" height="6" fill="#111"/>
+      <!-- Eye -->
+      <rect x="18" y="10" width="2" height="2" fill="#fff"/>
+      <rect x="19" y="10" width="1" height="1" fill="#111"/>
+      <!-- Eye ring yellow -->
+      <rect x="17" y="9" width="4" height="4" fill="none"/>
+      <rect x="18" y="9" width="3" height="1" fill="#ffd700"/>
+      <rect x="21" y="10" width="1" height="2" fill="#ffd700"/>
+      <rect x="18" y="12" width="3" height="1" fill="#ffd700"/>
+      <rect x="17" y="10" width="1" height="2" fill="#ffd700"/>
+      <!-- Beak - big colorful toucan beak -->
+      <rect x="5" y="10" width="8" height="3" fill="#ffd700"/>
+      <rect x="5" y="13" width="8" height="2" fill="#ff8c00"/>
+      <rect x="4" y="11" width="2" height="2" fill="#ffd700"/>
+      <rect x="13" y="10" width="1" height="5" fill="#222"/>
+      <!-- Beak tip red -->
+      <rect x="4" y="10" width="2" height="1" fill="#ff1744"/>
+      <rect x="3" y="11" width="2" height="1" fill="#ff1744"/>
+      <!-- Wing -->
+      <rect x="10" y="15" width="3" height="8" fill="#222"/>
+      <!-- Tail -->
+      <rect x="22" y="20" width="4" height="3" fill="#222"/>
+      <rect x="23" y="18" width="2" height="2" fill="#333"/>
+      <!-- Feet -->
+      <rect x="13" y="26" width="3" height="2" fill="#ff8c00"/>
+      <rect x="18" y="26" width="3" height="2" fill="#ff8c00"/>
+      <rect x="12" y="28" width="2" height="1" fill="#ff8c00"/>
+      <rect x="17" y="28" width="2" height="1" fill="#ff8c00"/>
+      <rect x="15" y="28" width="2" height="1" fill="#ff8c00"/>
+      <rect x="20" y="28" width="2" height="1" fill="#ff8c00"/>
+    </svg>
+  </div>
+
+  <div>
+    <div class="logo">DRILL<span>BIRD</span></div>
+    <div class="tagline">▸ math fact fluency trainer ◂</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">▸ choose operation ◂</div>
+    <div class="op-grid">
+      <button class="op-btn mult" onclick="selectOperation('mult')">
+        <span class="op-icon">✕</span>
+        MULTI-<br>PLICATION
+      </button>
+      <button class="op-btn sub" onclick="selectOperation('sub')">
+        <span class="op-icon">−</span>
+        SUB-<br>TRACTION
+      </button>
+    </div>
+  </div>
+
+  <div class="tagline" style="color:#333">drillbird.com • free forever</div>
+
+  <div class="sound-toggle" onclick="toggleSound()" id="homeSoundToggle">
+    <div class="toggle-track" id="homeSoundTrack"><div class="toggle-thumb"></div></div>
+    <span id="homeSoundLabel">SOUND OFF</span>
+  </div>
+</div>
+
+<!-- SCREEN 2: SET SELECT -->
+<div class="screen" id="setScreen">
+  <div class="toucan-wrap">
+    <svg class="toucan" id="setToucan" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+      <rect x="10" y="14" width="14" height="12" fill="#111"/>
+      <rect x="11" y="13" width="12" height="2" fill="#111"/>
+      <rect x="12" y="15" width="8" height="8" fill="#f0f0f0"/>
+      <rect x="11" y="16" width="10" height="6" fill="#f0f0f0"/>
+      <rect x="12" y="8" width="10" height="8" fill="#111"/>
+      <rect x="11" y="9" width="12" height="6" fill="#111"/>
+      <rect x="18" y="10" width="2" height="2" fill="#fff"/>
+      <rect x="19" y="10" width="1" height="1" fill="#111"/>
+      <rect x="18" y="9" width="3" height="1" fill="#ffd700"/>
+      <rect x="21" y="10" width="1" height="2" fill="#ffd700"/>
+      <rect x="18" y="12" width="3" height="1" fill="#ffd700"/>
+      <rect x="17" y="10" width="1" height="2" fill="#ffd700"/>
+      <rect x="5" y="10" width="8" height="3" fill="#ffd700"/>
+      <rect x="5" y="13" width="8" height="2" fill="#ff8c00"/>
+      <rect x="4" y="11" width="2" height="2" fill="#ffd700"/>
+      <rect x="13" y="10" width="1" height="5" fill="#222"/>
+      <rect x="4" y="10" width="2" height="1" fill="#ff1744"/>
+      <rect x="3" y="11" width="2" height="1" fill="#ff1744"/>
+      <rect x="10" y="15" width="3" height="8" fill="#222"/>
+      <rect x="22" y="20" width="4" height="3" fill="#222"/>
+      <rect x="23" y="18" width="2" height="2" fill="#333"/>
+      <rect x="13" y="26" width="3" height="2" fill="#ff8c00"/>
+      <rect x="18" y="26" width="3" height="2" fill="#ff8c00"/>
+      <rect x="12" y="28" width="2" height="1" fill="#ff8c00"/>
+      <rect x="17" y="28" width="2" height="1" fill="#ff8c00"/>
+      <rect x="15" y="28" width="2" height="1" fill="#ff8c00"/>
+      <rect x="20" y="28" width="2" height="1" fill="#ff8c00"/>
+    </svg>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title" id="setScreenTitle">▸ choose a set ◂</div>
+    <div class="set-grid" id="setGrid"></div>
+  </div>
+
+  <button class="back-btn" onclick="goHome()">◂ back</button>
+</div>
+
+<!-- SCREEN 3: DRILL -->
+<div class="screen" id="drillScreen">
+  <div style="width:100%; display:flex; justify-content:space-between; align-items:center;">
+    <div style="font-size:7px; color:var(--gray)" id="drillSetLabel">—</div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div class="sound-toggle" onclick="toggleSound()" id="drillSoundToggle">
+        <div class="toggle-track" id="drillSoundTrack"><div class="toggle-thumb"></div></div>
+        <span id="drillSoundLabel">SFX</span>
+      </div>
+      <div class="live-timer">⏱ <span id="liveTimer">0:00</span></div>
+    </div>
+  </div>
+
+  <div class="progress-bar-wrap">
+    <div class="progress-bar-fill" id="progressFill" style="width:0%"></div>
+  </div>
+  <div class="progress-label">
+    <span id="progressText">0 mastered</span>
+    <span id="queueText">— remaining</span>
+  </div>
+
+  <div class="panel">
+    <div class="toucan-wrap">
+      <svg class="toucan" id="drillToucan" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+        <rect x="10" y="14" width="14" height="12" fill="#111"/>
+        <rect x="11" y="13" width="12" height="2" fill="#111"/>
+        <rect x="12" y="15" width="8" height="8" fill="#f0f0f0"/>
+        <rect x="11" y="16" width="10" height="6" fill="#f0f0f0"/>
+        <rect x="12" y="8" width="10" height="8" fill="#111"/>
+        <rect x="11" y="9" width="12" height="6" fill="#111"/>
+        <rect x="18" y="10" width="2" height="2" fill="#fff"/>
+        <rect x="19" y="10" width="1" height="1" fill="#111"/>
+        <rect x="18" y="9" width="3" height="1" fill="#ffd700"/>
+        <rect x="21" y="10" width="1" height="2" fill="#ffd700"/>
+        <rect x="18" y="12" width="3" height="1" fill="#ffd700"/>
+        <rect x="17" y="10" width="1" height="2" fill="#ffd700"/>
+        <rect x="5" y="10" width="8" height="3" fill="#ffd700"/>
+        <rect x="5" y="13" width="8" height="2" fill="#ff8c00"/>
+        <rect x="4" y="11" width="2" height="2" fill="#ffd700"/>
+        <rect x="13" y="10" width="1" height="5" fill="#222"/>
+        <rect x="4" y="10" width="2" height="1" fill="#ff1744"/>
+        <rect x="3" y="11" width="2" height="1" fill="#ff1744"/>
+        <rect x="10" y="15" width="3" height="8" fill="#222"/>
+        <rect x="22" y="20" width="4" height="3" fill="#222"/>
+        <rect x="23" y="18" width="2" height="2" fill="#333"/>
+        <rect x="13" y="26" width="3" height="2" fill="#ff8c00"/>
+        <rect x="18" y="26" width="3" height="2" fill="#ff8c00"/>
+        <rect x="12" y="28" width="2" height="1" fill="#ff8c00"/>
+        <rect x="17" y="28" width="2" height="1" fill="#ff8c00"/>
+        <rect x="15" y="28" width="2" height="1" fill="#ff8c00"/>
+        <rect x="20" y="28" width="2" height="1" fill="#ff8c00"/>
+      </svg>
+    </div>
+
+    <div class="fact-display">
+      <div class="fact-equation" id="factEquation">—</div>
+      <input
+        type="number"
+        class="answer-input"
+        id="answerInput"
+        placeholder="?"
+        autocomplete="off"
+        inputmode="numeric"
+        min="0"
+        max="200"
+      />
+      <div style="margin-top:16px;">
+        <button class="submit-btn" id="submitBtn" onclick="submitAnswer()">ENTER</button>
+      </div>
+      <div class="feedback-msg" id="feedbackMsg"></div>
+      <div class="correct-answer-reveal" id="correctReveal"></div>
+    </div>
+
+    <div class="queue-status" id="queueStatus"></div>
+  </div>
+
+  <button class="back-btn" onclick="confirmQuit()">✕ quit set</button>
+</div>
+
+<!-- SCREEN 4: COMPLETION -->
+<div class="screen" id="completionScreen">
+  <div class="teacher-banner" id="teacherBanner">
+    ★ SHOW YOUR TEACHER ★
+  </div>
+
+  <div class="toucan-wrap">
+    <svg class="toucan dancing" id="completionToucan" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+      <rect x="10" y="14" width="14" height="12" fill="#111"/>
+      <rect x="11" y="13" width="12" height="2" fill="#111"/>
+      <rect x="12" y="15" width="8" height="8" fill="#f0f0f0"/>
+      <rect x="11" y="16" width="10" height="6" fill="#f0f0f0"/>
+      <rect x="12" y="8" width="10" height="8" fill="#111"/>
+      <rect x="11" y="9" width="12" height="6" fill="#111"/>
+      <rect x="18" y="10" width="2" height="2" fill="#fff"/>
+      <rect x="19" y="10" width="1" height="1" fill="#111"/>
+      <rect x="18" y="9" width="3" height="1" fill="#ffd700"/>
+      <rect x="21" y="10" width="1" height="2" fill="#ffd700"/>
+      <rect x="18" y="12" width="3" height="1" fill="#ffd700"/>
+      <rect x="17" y="10" width="1" height="2" fill="#ffd700"/>
+      <rect x="5" y="10" width="8" height="3" fill="#ffd700"/>
+      <rect x="5" y="13" width="8" height="2" fill="#ff8c00"/>
+      <rect x="4" y="11" width="2" height="2" fill="#ffd700"/>
+      <rect x="13" y="10" width="1" height="5" fill="#222"/>
+      <rect x="4" y="10" width="2" height="1" fill="#ff1744"/>
+      <rect x="3" y="11" width="2" height="1" fill="#ff1744"/>
+      <rect x="10" y="15" width="3" height="8" fill="#222"/>
+      <rect x="22" y="20" width="4" height="3" fill="#222"/>
+      <rect x="23" y="18" width="2" height="2" fill="#333"/>
+      <rect x="13" y="26" width="3" height="2" fill="#ff8c00"/>
+      <rect x="18" y="26" width="3" height="2" fill="#ff8c00"/>
+      <rect x="12" y="28" width="2" height="1" fill="#ff8c00"/>
+      <rect x="17" y="28" width="2" height="1" fill="#ff8c00"/>
+      <rect x="15" y="28" width="2" height="1" fill="#ff8c00"/>
+      <rect x="20" y="28" width="2" height="1" fill="#ff8c00"/>
+    </svg>
+  </div>
+
+  <div class="completion-header">
+    <div class="completion-title">SET<br>CLEARED!</div>
+    <div class="completion-set-name" id="completionSetName"></div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-box time-box">
+      <span class="stat-value" id="statTime">—</span>
+      <span class="stat-label">TIME</span>
+    </div>
+    <div class="stat-box attempts-box">
+      <span class="stat-value" id="statAttempts">—</span>
+      <span class="stat-label">TOTAL<br>ATTEMPTS</span>
+    </div>
+    <div class="stat-box accuracy-box">
+      <span class="stat-value" id="statAccuracy">—</span>
+      <span class="stat-label">FIRST-TRY<br>ACCURACY</span>
+    </div>
+  </div>
+
+  <div class="pixel-divider"></div>
+
+  <div class="most-missed-box" id="mostMissedBox">
+    <div class="most-missed-label">▸ TALK TO YOUR TEACHER ABOUT ◂</div>
+    <div class="most-missed-fact" id="mostMissedFact"></div>
+    <div class="most-missed-count" id="mostMissedCount"></div>
+  </div>
+
+  <div class="btn-row">
+    <button class="pixel-btn" onclick="retrySet()">↺ TRY AGAIN</button>
+    <button class="pixel-btn secondary" onclick="goHome()">⌂ HOME</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// SOUND ENGINE
+// ============================================================
+
+let soundOn = false;
+let audioCtx = null;
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playTone(freq, type, duration, gainVal) {
+  if (!soundOn) return;
+  try {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    gain.gain.setValueAtTime(gainVal, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + duration);
+  } catch(e) {}
+}
+
+function playCorrect() {
+  playTone(523, 'square', 0.08, 0.3);
+  setTimeout(() => playTone(784, 'square', 0.12, 0.3), 80);
+}
+
+function playWrong() {
+  playTone(180, 'square', 0.15, 0.25);
+  setTimeout(() => playTone(140, 'square', 0.2, 0.2), 100);
+}
+
+function playComplete() {
+  const notes = [523, 659, 784, 1047];
+  notes.forEach((freq, i) => {
+    setTimeout(() => playTone(freq, 'square', 0.15, 0.25), i * 100);
+  });
+}
+
+function toggleSound() {
+  soundOn = !soundOn;
+  // Sync all toggle UI instances
+  ['homeSoundTrack','drillSoundTrack'].forEach(id => {
+    const track = document.getElementById(id);
+    if (track) track.className = 'toggle-track' + (soundOn ? ' on' : '');
+  });
+  ['homeSoundLabel','drillSoundLabel'].forEach(id => {
+    const label = document.getElementById(id);
+    if (label) label.textContent = soundOn ? (id === 'homeSoundLabel' ? 'SOUND ON' : 'SFX ON') : (id === 'homeSoundLabel' ? 'SOUND OFF' : 'SFX');
+  });
+  if (soundOn) playCorrect();
+}
+
+// ============================================================
+// DATA
+// ============================================================
+
+const SETS = {
+  mult: [
+    {
+      id: 'mult-2-5',
+      name: '2s and 5s',
+      description: 'Easiest entry point',
+      facts: generateMultFacts([2, 5])
+    },
+    {
+      id: 'mult-3-4',
+      name: '3s and 4s',
+      description: 'Grade 4 core target',
+      facts: generateMultFacts([3, 4])
+    },
+    {
+      id: 'mult-6-7',
+      name: '6s and 7s',
+      description: 'Common struggle zone',
+      facts: generateMultFacts([6, 7])
+    },
+    {
+      id: 'mult-8-9',
+      name: '8s and 9s',
+      description: 'Advanced fluency',
+      facts: generateMultFacts([8, 9])
+    },
+    {
+      id: 'mult-mix',
+      name: 'Mixed Review',
+      description: '20 random facts, 2–12',
+      facts: generateMultFacts([2,3,4,5,6,7,8,9,10,11,12]),
+      isMixed: true
+    }
+  ],
+  sub: [
+    {
+      id: 'sub-easy',
+      name: 'Minuends 1–10',
+      description: 'Foundation facts',
+      facts: generateSubFacts(1, 10)
+    },
+    {
+      id: 'sub-hard',
+      name: 'Minuends 11–18',
+      description: 'Grade 4 struggle zone',
+      facts: generateSubFacts(11, 18)
+    },
+    {
+      id: 'sub-bridge',
+      name: 'Bridging 10 and 20',
+      description: 'Place value connection',
+      facts: generateBridgeFacts()
+    },
+    {
+      id: 'sub-mix',
+      name: 'Mixed Review',
+      description: '20 random facts',
+      facts: generateSubFacts(1, 18),
+      isMixed: true
+    }
+  ]
+};
+
+function generateMultFacts(multipliers) {
+  const facts = [];
+  for (const m of multipliers) {
+    for (let n = 2; n <= 12; n++) {
+      facts.push({ a: m, b: n, answer: m * n, label: `${m} × ${n}` });
+      if (n !== m) facts.push({ a: n, b: m, answer: n * m, label: `${n} × ${m}` });
+    }
+  }
+  // Dedupe
+  const seen = new Set();
+  return facts.filter(f => {
+    const key = [Math.min(f.a,f.b), Math.max(f.a,f.b)].join('x');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function generateSubFacts(minMin, minMax) {
+  const facts = [];
+  for (let minuend = minMin; minuend <= minMax; minuend++) {
+    for (let sub = 1; sub < minuend; sub++) {
+      facts.push({
+        a: minuend,
+        b: sub,
+        answer: minuend - sub,
+        label: `${minuend} − ${sub}`
+      });
+    }
+  }
+  return facts;
+}
+
+function generateBridgeFacts() {
+  const facts = [];
+  [10, 20].forEach(base => {
+    for (let sub = 1; sub < base; sub++) {
+      facts.push({
+        a: base,
+        b: sub,
+        answer: base - sub,
+        label: `${base} − ${sub}`
+      });
+    }
+  });
+  return facts;
+}
+
+// ============================================================
+// STATE
+// ============================================================
+
+let currentOp = null;
+let currentSet = null;
+let queue = [];
+let mastered = new Set();
+let missLog = {};
+let totalFacts = 0;
+let totalAttempts = 0;
+let firstTryCorrect = 0;
+let firstTryTracker = {};
+let startTime = null;
+let timerInterval = null;
+let awaitingNext = false;
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function goHome() {
+  clearInterval(timerInterval);
+  showScreen('homeScreen');
+}
+
+function selectOperation(op) {
+  currentOp = op;
+  renderSetSelect(op);
+  showScreen('setScreen');
+}
+
+function renderSetSelect(op) {
+  const sets = SETS[op];
+  const grid = document.getElementById('setGrid');
+  const title = document.getElementById('setScreenTitle');
+  title.textContent = op === 'mult' ? '▸ multiplication sets ◂' : '▸ subtraction sets ◂';
+
+  grid.innerHTML = sets.map(set => `
+    <button class="set-btn ${op}-set" onclick="startSet('${op}', '${set.id}')">
+      <span>${set.name}<br><span style="color:var(--gray);font-size:6px">${set.description}</span></span>
+      <span class="set-count">${set.isMixed ? '20' : set.facts.length} facts</span>
+    </button>
+  `).join('');
+}
+
+function startSet(op, setId) {
+  currentOp = op;
+  currentSet = SETS[op].find(s => s.id === setId);
+
+  // Shuffle facts, cap mixed at 20
+  let allFacts = shuffle([...currentSet.facts]);
+  if (currentSet.isMixed) allFacts = allFacts.slice(0, 20);
+  queue = allFacts;
+  totalFacts = queue.length;
+
+  mastered = new Set();
+  missLog = {};
+  totalAttempts = 0;
+  firstTryCorrect = 0;
+  firstTryTracker = {};
+  awaitingNext = false;
+
+  document.getElementById('drillSetLabel').textContent =
+    `${op === 'mult' ? '✕' : '−'} ${currentSet.name}`;
+
+  startTime = Date.now();
+  clearInterval(timerInterval);
+  timerInterval = setInterval(updateTimer, 1000);
+
+  updateProgress();
+  showNextFact();
+  showScreen('drillScreen');
+
+  setTimeout(() => {
+    document.getElementById('answerInput').focus();
+  }, 100);
+}
+
+function retrySet() {
+  startSet(currentOp, currentSet.id);
+}
+
+function confirmQuit() {
+  if (confirm('Quit this set? Progress will be lost.')) {
+    clearInterval(timerInterval);
+    goHome();
+  }
+}
+
+// ============================================================
+// DRILL LOGIC
+// ============================================================
+
+function showNextFact() {
+  if (queue.length === 0) {
+    finishSet();
+    return;
+  }
+
+  const fact = queue[0];
+  const eq = document.getElementById('factEquation');
+  eq.textContent = fact.label + ' =';
+  eq.className = 'fact-equation ' + (currentOp === 'mult' ? 'mult-color' : 'sub-color');
+
+  document.getElementById('feedbackMsg').textContent = '';
+  document.getElementById('feedbackMsg').className = 'feedback-msg';
+  document.getElementById('correctReveal').textContent = '';
+
+  const input = document.getElementById('answerInput');
+  input.value = '';
+  input.className = 'answer-input';
+  input.focus();
+
+  updateQueueStatus();
+  awaitingNext = false;
+}
+
+document.getElementById('answerInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    if (awaitingNext) {
+      showNextFact();
+      return;
+    }
+    submitAnswer();
+  }
+});
+
+document.getElementById('answerInput').addEventListener('input', function() {
+  // Auto-submit when answer length seems complete (optional UX)
+});
+
+function setSubmitEnabled(enabled) {
+  const btn = document.getElementById('submitBtn');
+  if (btn) btn.disabled = !enabled;
+}
+
+function submitAnswer() {
+  if (awaitingNext) return;
+
+  const input = document.getElementById('answerInput');
+  const val = parseInt(input.value, 10);
+  if (isNaN(val)) return;
+
+  const fact = queue[0];
+  const isCorrect = val === fact.answer;
+
+  totalAttempts++;
+  setSubmitEnabled(false);
+
+  // Track first-try accuracy
+  if (!firstTryTracker[fact.label]) {
+    firstTryTracker[fact.label] = true;
+    if (isCorrect) firstTryCorrect++;
+  }
+
+  if (isCorrect) {
+    queue.shift();
+    mastered.add(fact.label);
+    updateProgress();
+
+    input.className = 'answer-input correct-flash';
+    showFeedback('correct', '✓ CORRECT!');
+    playCorrect();
+    animateToucan('correct');
+
+    awaitingNext = true;
+    if (queue.length === 0) {
+      setTimeout(finishSet, 600);
+    } else {
+      setTimeout(() => {
+        showNextFact();
+        setSubmitEnabled(true);
+      }, 500);
+    }
+  } else {
+    missLog[fact.label] = (missLog[fact.label] || 0) + 1;
+
+    queue.shift();
+    queue.push(fact);
+
+    input.className = 'answer-input wrong-flash';
+    showFeedback('wrong', '✗ NOT QUITE');
+    document.getElementById('correctReveal').textContent = `${fact.label} = ${fact.answer}`;
+    playWrong();
+    animateToucan('wrong');
+
+    awaitingNext = true;
+    setTimeout(() => {
+      showNextFact();
+      setSubmitEnabled(true);
+    }, 800);
+  }
+}
+
+function showFeedback(type, msg) {
+  const el = document.getElementById('feedbackMsg');
+  el.textContent = msg;
+  el.className = `feedback-msg ${type}`;
+}
+
+function updateProgress() {
+  const total = totalFacts;
+  const done = mastered.size;
+  const pct = (done / total) * 100;
+
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressText').textContent = `${done} mastered`;
+  document.getElementById('queueText').textContent = `${queue.length} remaining`;
+}
+
+function updateQueueStatus() {
+  const repeats = Object.values(missLog).filter(v => v > 0).length;
+  if (repeats > 0) {
+    document.getElementById('queueStatus').textContent =
+      `↺ ${repeats} fact${repeats > 1 ? 's' : ''} in retry queue`;
+  } else {
+    document.getElementById('queueStatus').textContent = '';
+  }
+}
+
+function updateTimer() {
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+  const m = Math.floor(elapsed / 60);
+  const s = elapsed % 60;
+  document.getElementById('liveTimer').textContent =
+    `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+// ============================================================
+// COMPLETION
+// ============================================================
+
+function finishSet() {
+  clearInterval(timerInterval);
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+
+  // Stats
+  const m = Math.floor(elapsed / 60);
+  const s = elapsed % 60;
+  document.getElementById('statTime').textContent = `${m}:${s.toString().padStart(2, '0')}`;
+  document.getElementById('statAttempts').textContent = totalAttempts;
+
+  const pct = totalFacts > 0 ? Math.round((firstTryCorrect / totalFacts) * 100) : 100;
+  document.getElementById('statAccuracy').textContent = pct + '%';
+
+  document.getElementById('completionSetName').textContent =
+    `${currentOp === 'mult' ? '✕' : '−'} ${currentSet.name}`;
+
+  // Most missed
+  const missedBox = document.getElementById('mostMissedBox');
+  const missedFact = document.getElementById('mostMissedFact');
+  const missedCount = document.getElementById('mostMissedCount');
+
+  const missEntries = Object.entries(missLog).filter(([,v]) => v > 0);
+  if (missEntries.length === 0) {
+    missedBox.style.borderColor = 'var(--green)';
+    missedBox.style.background = '#001a00';
+    document.querySelector('.most-missed-label').style.color = 'var(--green)';
+    document.querySelector('.most-missed-label').textContent = '▸ PERFECT ROUND ◂';
+    missedFact.innerHTML = '<span class="no-misses">CLEAN!</span>';
+    missedCount.textContent = 'First try on every fact';
+  } else {
+    missedBox.style.borderColor = 'var(--orange)';
+    missedBox.style.background = '#1a0a00';
+    document.querySelector('.most-missed-label').style.color = 'var(--orange)';
+    document.querySelector('.most-missed-label').textContent = '▸ TALK TO YOUR TEACHER ABOUT ◂';
+
+    missEntries.sort((a, b) => b[1] - a[1]);
+    const [topFact, topCount] = missEntries[0];
+    missedFact.textContent = topFact;
+    missedFact.style.color = 'var(--white)';
+    missedCount.textContent = `missed ${topCount} time${topCount > 1 ? 's' : ''}`;
+  }
+
+  // Pixel star celebration
+  playComplete();
+  launchStars();
+
+  showScreen('completionScreen');
+
+  // Stop dancing after 3 seconds
+  setTimeout(() => {
+    document.getElementById('completionToucan').classList.remove('dancing');
+  }, 3000);
+}
+
+// ============================================================
+// ANIMATIONS
+// ============================================================
+
+function animateToucan(type) {
+  const t = document.getElementById('drillToucan');
+  t.classList.remove('dancing', 'wrong');
+  void t.offsetWidth;
+  if (type === 'wrong') t.classList.add('wrong');
+}
+
+function launchStars() {
+  const container = document.getElementById('starsContainer');
+  container.innerHTML = '';
+  const colors = ['#ffd700', '#ff8c00', '#00e676', '#40c4ff', '#ff1744', '#7c4dff'];
+  for (let i = 0; i < 40; i++) {
+    const star = document.createElement('div');
+    star.className = 'pixel-star';
+    star.style.left = Math.random() * 100 + 'vw';
+    star.style.top = -8 + 'px';
+    star.style.background = colors[Math.floor(Math.random() * colors.length)];
+    star.style.animationDelay = (Math.random() * 0.8) + 's';
+    star.style.animationDuration = (0.8 + Math.random() * 0.8) + 's';
+    star.style.width = (Math.random() > 0.5 ? 8 : 12) + 'px';
+    star.style.height = star.style.width;
+    container.appendChild(star);
+  }
+  setTimeout(() => { container.innerHTML = ''; }, 2000);
+}
+
+// ============================================================
+// UTILITIES
+// ============================================================
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+</script>
+</body>
+</html>
